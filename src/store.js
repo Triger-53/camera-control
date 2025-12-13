@@ -1,0 +1,66 @@
+import { create } from 'zustand'
+import Peer from 'peerjs'
+
+const useStore = create((set, get) => ({
+    handPosition: [0, 0, 0],
+    isPinching: false,
+    isOpenPalm: false,
+    gesture: 'NONE',
+    mode: 'NONE', // 'HOST', 'CONTROLLER', 'STANDALONE'
+    peer: null,
+    conn: null,
+    peerId: null, // My ID
+    targetId: '', // ID to connect to
+
+    setMode: (mode) => {
+        set({ mode });
+
+        if (mode === 'STANDALONE') {
+            // No networking needed
+            return;
+        }
+
+        // Initialize PeerJS for Host or Controller
+        const peer = new Peer();
+
+        peer.on('open', (id) => {
+            console.log('My Peer ID is: ' + id);
+            set({ peerId: id, peer });
+        });
+
+        if (mode === 'HOST') {
+            peer.on('connection', (conn) => {
+                console.log('Controller connected');
+                set({ conn });
+                conn.on('data', (data) => {
+                    set(data);
+                });
+            });
+        }
+    },
+
+    connectToHost: (hostId) => {
+        const { peer } = get();
+        if (!peer) return;
+
+        const conn = peer.connect(hostId);
+        conn.on('open', () => {
+            console.log('Connected to Host');
+            set({ conn });
+        });
+        set({ targetId: hostId });
+    },
+
+    setHandData: (data) => {
+        set((state) => {
+            // If Controller, send data
+            if (state.mode === 'CONTROLLER' && state.conn) {
+                state.conn.send(data);
+            }
+            // Update local state (for Standalone or local feedback)
+            return { ...state, ...data };
+        });
+    },
+}))
+
+export default useStore
