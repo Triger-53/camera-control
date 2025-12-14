@@ -12,6 +12,17 @@ const useStore = create((set, get) => ({
     peerId: null, // My ID
     targetId: '', // ID to connect to
 
+    // 3D Transformations
+    rotation: [0, 0, 0],
+    zoom: 1,
+    shapePosition: [0, 0, 0],
+
+    // Camera Control
+    cameraDeviceId: null,
+    availableCameras: [],
+    setCameraDeviceId: (id) => set({ cameraDeviceId: id }),
+    setAvailableCameras: (cameras) => set({ availableCameras: cameras }),
+
     setMode: (mode) => {
         set({ mode });
 

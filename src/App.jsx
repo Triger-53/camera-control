@@ -4,7 +4,7 @@ import { OrbitControls, Html, useProgress } from '@react-three/drei'
 import HandTracker from './components/HandTracker'
 import ParticleSystem from './components/ParticleSystem'
 import useStore from './store'
-import { Hand, Zap, Move, Smartphone, Loader2 } from 'lucide-react'
+import { Hand, Zap, Move, Smartphone, Loader2, Video } from 'lucide-react'
 import './App.css'
 
 function Loader() {
@@ -24,12 +24,19 @@ function Loader() {
 }
 
 const UIOverlay = () => {
-  const { gesture, isPinching } = useStore();
+  const { gesture, isPinching, availableCameras, setCameraDeviceId, cameraDeviceId } = useStore();
   const [ipAddress, setIpAddress] = useState('localhost');
 
   useEffect(() => {
     setIpAddress(window.location.hostname);
   }, []);
+
+  const cycleCamera = () => {
+    if (availableCameras.length < 2) return;
+    const currentIndex = availableCameras.findIndex(c => c.deviceId === cameraDeviceId);
+    const nextIndex = (currentIndex + 1) % availableCameras.length;
+    setCameraDeviceId(availableCameras[nextIndex].deviceId);
+  };
 
   return (
     <div className="ui-overlay">
@@ -49,17 +56,26 @@ const UIOverlay = () => {
         </div>
         <div className={`instruction-item ${isPinching ? 'active' : ''}`}>
           <Zap size={20} />
-          <span><strong>Pinch</strong><br />Attract & Swirl</span>
+          <span><strong>1 Hand Pinch</strong><br />Drag & Swirl</span>
         </div>
         <div className="instruction-item">
           <Move size={20} />
-          <span><strong>Move Hand</strong><br />Repel Particles</span>
+          <span><strong>2 Hands</strong><br />Zoom & Rotate</span>
         </div>
       </div>
 
-      <div className="mobile-connect">
-        <Smartphone size={16} />
-        <span>Connect Mobile: <strong>https://{ipAddress}:5173</strong></span>
+      <div className="bottom-controls">
+        <div className="mobile-connect">
+          <Smartphone size={16} />
+          <span>Connect Mobile: <strong>https://{ipAddress}:5173</strong></span>
+        </div>
+
+        {availableCameras.length > 1 && (
+          <button className="camera-switch" onClick={cycleCamera}>
+            <Video size={16} />
+            <span>Switch Camera</span>
+          </button>
+        )}
       </div>
 
       <style>{`
@@ -150,8 +166,13 @@ const UIOverlay = () => {
                     font-size: 0.9rem;
                     line-height: 1.2;
                 }
-                .mobile-connect {
-                    align-self: flex-start;
+                .bottom-controls {
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                    pointer-events: auto;
+                }
+                .mobile-connect, .camera-switch {
                     background: rgba(255, 255, 255, 0.1);
                     backdrop-filter: blur(10px);
                     padding: 10px 20px;
@@ -161,6 +182,12 @@ const UIOverlay = () => {
                     gap: 10px;
                     font-size: 0.85rem;
                     border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: white;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                .camera-switch:hover {
+                    background: rgba(255, 255, 255, 0.2);
                 }
             `}</style>
     </div>
@@ -245,7 +272,7 @@ function App() {
       {/* Show 3D Scene if Host OR Standalone */}
       {(mode === 'HOST' || mode === 'STANDALONE') && (
         <>
-          <Canvas camera={{ position: [0, 0, 6], fov: 50 }} dpr={[1, 2]}>
+          <Canvas camera={{ position: [0, 0, 6], fov: 50 }} dpr={[1, 1.5]}>
             <color attach="background" args={['#050505']} />
             <ambientLight intensity={0.2} />
             <pointLight position={[10, 10, 10]} intensity={1} />

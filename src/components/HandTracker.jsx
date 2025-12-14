@@ -8,6 +8,7 @@ const HandTracker = () => {
     const [webcamRunning, setWebcamRunning] = useState(false);
     const [loading, setLoading] = useState(true);
     const setHandData = useStore((state) => state.setHandData);
+    const { cameraDeviceId, setAvailableCameras, availableCameras, setCameraDeviceId } = useStore();
     const lastVideoTimeRef = useRef(-1);
     const handLandmarkerRef = useRef(null);
 
@@ -26,7 +27,7 @@ const HandTracker = () => {
                         delegate: 'GPU',
                     },
                     runningMode: 'VIDEO',
-                    numHands: 1,
+                    numHands: 2,
                 });
                 console.log('HandLandmarker initialized');
                 setLoading(false);
@@ -38,16 +39,34 @@ const HandTracker = () => {
         };
 
         initHandLandmarker();
+
+        // Enumerate Cameras
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+            const cameras = devices.filter(d => d.kind === 'videoinput');
+            setAvailableCameras(cameras);
+            if (cameras.length > 0 && !cameraDeviceId) {
+                // Prefer back camera if available (environment), else first
+                const back = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('environment'));
+                setCameraDeviceId(back ? back.deviceId : cameras[0].deviceId);
+            }
+        });
     }, []);
+
+    // Re-enable cam when deviceId changes
+    useEffect(() => {
+        if (webcamRunning) {
+            enableCam();
+        }
+    }, [cameraDeviceId]);
 
     const enableCam = () => {
         if (!handLandmarkerRef.current) return;
 
         const constraints = {
             video: {
-                facingMode: 'user',
-                width: 640,
-                height: 480
+                deviceId: cameraDeviceId ? { exact: cameraDeviceId } : undefined,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
             }
         };
 
@@ -70,49 +89,86 @@ const HandTracker = () => {
                 const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
 
                 if (results.landmarks && results.landmarks.length > 0) {
-                    const landmarks = results.landmarks[0];
+                    const hands = results.landmarks;
+                    const hand1 = hands[0];
+                    const hand2 = hands.length > 1 ? hands[1] : null;
 
-                    // Key Landmarks
-                    const indexTip = landmarks[8];
-                    const thumbTip = landmarks[4];
-                    const middleTip = landmarks[12];
-                    const ringTip = landmarks[16];
-                    const pinkyTip = landmarks[20];
-                    const wrist = landmarks[0];
+                    // Helper to get position
+                    const getPos = (hand) => {
+                        const index = hand[8];
+                        return {
+                            x: (index.x - 0.5) * -2.5,
+                            y: -(index.y - 0.5) * 2.5
+                        };
+                    };
 
-                    // Raw Position (Normalized)
-                    // Map 0..1 to -1..1 range
-                    const rawX = (indexTip.x - 0.5) * -2.5; // Wider range
-                    const rawY = -(indexTip.y - 0.5) * 2.5;
+                    const h1Pos = getPos(hand1);
 
-                    // Smoothing
-                    const smoothFactor = 0.2; // Lower = smoother but more lag
-                    const x = lerp(previousPosition.current[0], rawX, smoothFactor);
-                    const y = lerp(previousPosition.current[1], rawY, smoothFactor);
-                    const z = 0; // Depth is hard to estimate accurately without depth sensor
-
+                    // 1. Hand Position (Primary)
+                    const smoothFactor = 0.2;
+                    const x = lerp(previousPosition.current[0], h1Pos.x, smoothFactor);
+                    const y = lerp(previousPosition.current[1], h1Pos.y, smoothFactor);
+                    const z = 0;
                     previousPosition.current = [x, y, z];
 
-                    // Gesture Logic
+                    // 2. Pinch Detection (Primary Hand)
+                    const indexTip = hand1[8];
+                    const thumbTip = hand1[4];
                     const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
                     const isPinching = pinchDist < 0.06;
 
+                    // 3. Open Palm (Primary Hand)
+                    const wrist = hand1[0];
                     const isFingerExtended = (tip, wrist) => Math.hypot(tip.x - wrist.x, tip.y - wrist.y) > 0.15;
-                    const isOpenPalm = isFingerExtended(indexTip, wrist) &&
-                        isFingerExtended(middleTip, wrist) &&
-                        isFingerExtended(ringTip, wrist) &&
-                        isFingerExtended(pinkyTip, wrist) &&
+                    const isOpenPalm = isFingerExtended(hand1[8], wrist) &&
+                        isFingerExtended(hand1[12], wrist) &&
+                        isFingerExtended(hand1[16], wrist) &&
+                        isFingerExtended(hand1[20], wrist) &&
                         !isPinching;
 
                     let gesture = 'NONE';
                     if (isPinching) gesture = 'PINCH';
                     else if (isOpenPalm) gesture = 'OPEN_PALM';
 
+                    // 4. Multi-Hand Gestures (Zoom, Rotate, Drag)
+                    let rotation = [0, 0, 0];
+                    let zoom = 1;
+                    let shapePosition = [0, 0, 0];
+
+                    if (hand2) {
+                        // Two Hands: Zoom & Rotate
+                        const h2Pos = getPos(hand2);
+
+                        // Distance -> Zoom
+                        const dist = Math.hypot(h1Pos.x - h2Pos.x, h1Pos.y - h2Pos.y);
+                        zoom = Math.max(0.5, Math.min(3, dist * 2)); // Map distance to zoom
+
+                        // Angle -> Rotation Z
+                        const angle = Math.atan2(h2Pos.y - h1Pos.y, h2Pos.x - h1Pos.x);
+                        rotation = [0, 0, angle];
+
+                        // Midpoint -> Position
+                        shapePosition = [
+                            (h1Pos.x + h2Pos.x) / 2,
+                            (h1Pos.y + h2Pos.y) / 2,
+                            0
+                        ];
+                    } else {
+                        // One Hand
+                        if (isPinching) {
+                            // Drag Mode
+                            shapePosition = [x, y, 0];
+                        }
+                    }
+
                     setHandData({
                         handPosition: [x, y, z],
                         isPinching,
                         isOpenPalm,
-                        gesture
+                        gesture,
+                        rotation,
+                        zoom,
+                        shapePosition
                     });
                 }
             }
@@ -141,20 +197,19 @@ const HandTracker = () => {
             <style>{`
         .hand-tracker-container {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
-            z-index: 50;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Background */
             pointer-events: none;
+            overflow: hidden;
         }
         .video-wrapper {
-            width: 160px;
-            height: 120px;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: black;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -164,15 +219,17 @@ const HandTracker = () => {
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
+            opacity: 0.6; /* Dim slightly so particles pop */
         }
         .loading-text {
             position: absolute;
-            top: -30px;
-            right: 0;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: white;
-            font-size: 12px;
+            font-size: 1.5rem;
             font-family: sans-serif;
-            opacity: 0.8;
+            z-index: 10;
         }
         .camera-placeholder {
             display: flex;
@@ -180,7 +237,7 @@ const HandTracker = () => {
             align-items: center;
             gap: 8px;
             color: rgba(255,255,255,0.5);
-            font-size: 12px;
+            font-size: 1rem;
         }
       `}</style>
         </div>

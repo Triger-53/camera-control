@@ -9,7 +9,7 @@ const DUMMY = new THREE.Object3D();
 
 const ParticleSystem = () => {
     const meshRef = useRef();
-    const { handPosition, isPinching, gesture } = useStore();
+    const { handPosition, isPinching, gesture, rotation, zoom, shapePosition } = useStore();
 
     // Current shape state
     const [shapeIndex, setShapeIndex] = useState(0);
@@ -148,6 +148,13 @@ const ParticleSystem = () => {
         }
     }, [gesture]);
 
+    // Reusable objects to avoid GC
+    const dummy = useMemo(() => new THREE.Object3D(), []);
+    const tempColor = useMemo(() => new THREE.Color(), []);
+    const tempV3 = useMemo(() => new THREE.Vector3(), []);
+    const tempDir = useMemo(() => new THREE.Vector3(), []);
+    const tempSwirl = useMemo(() => new THREE.Vector3(), []);
+
     useFrame((state) => {
         if (!meshRef.current) return;
 
@@ -155,7 +162,15 @@ const ParticleSystem = () => {
         const targetPos = positions[targetShapeName];
 
         const time = state.clock.getElapsedTime();
-        const handV = new THREE.Vector3(handPosition[0] * 5, handPosition[1] * 3, 0);
+
+        // Transform Hand Position to Local Space
+        const handVWorld = new THREE.Vector3(handPosition[0] * 5, handPosition[1] * 3, 0);
+
+        // Inverse transform logic
+        const localHandV = handVWorld.clone()
+            .sub(new THREE.Vector3(...shapePosition))
+            .divideScalar(zoom)
+            .applyEuler(new THREE.Euler(-rotation[0], -rotation[1], -rotation[2]));
 
         for (let i = 0; i < COUNT; i++) {
             const i3 = i * 3;
@@ -171,29 +186,31 @@ const ParticleSystem = () => {
             currentPositions[i3] += noise;
             currentPositions[i3 + 1] += Math.cos(time + i * 0.1) * 0.02;
 
-            // Hand Interaction
-            const p = new THREE.Vector3(currentPositions[i3], currentPositions[i3 + 1], currentPositions[i3 + 2]);
-            const dist = p.distanceTo(handV);
+            // Hand Interaction (using localHandV)
+            tempV3.set(currentPositions[i3], currentPositions[i3 + 1], currentPositions[i3 + 2]);
+            const dist = tempV3.distanceTo(localHandV);
 
             // Repel or Attract based on Pinch
+            // Note: If dragging (Pinch), we might want to disable attract to avoid "sticking"
+            // But user might want to drag AND swirl. Let's keep it for now.
             if (dist < 2.0) {
-                const dir = p.sub(handV).normalize();
+                tempDir.copy(tempV3).sub(localHandV).normalize();
                 const force = (2.0 - dist) * 0.8;
 
                 if (isPinching) {
                     // Attract/Swirl
-                    const swirl = new THREE.Vector3(-dir.y, dir.x, 0).multiplyScalar(0.1);
-                    currentPositions[i3] -= dir.x * force * 0.5;
-                    currentPositions[i3 + 1] -= dir.y * force * 0.5;
-                    currentPositions[i3 + 2] -= dir.z * force * 0.5;
+                    tempSwirl.set(-tempDir.y, tempDir.x, 0).multiplyScalar(0.1);
+                    currentPositions[i3] -= tempDir.x * force * 0.5;
+                    currentPositions[i3 + 1] -= tempDir.y * force * 0.5;
+                    currentPositions[i3 + 2] -= tempDir.z * force * 0.5;
 
-                    currentPositions[i3] += swirl.x;
-                    currentPositions[i3 + 1] += swirl.y;
+                    currentPositions[i3] += tempSwirl.x;
+                    currentPositions[i3 + 1] += tempSwirl.y;
                 } else {
                     // Repel
-                    currentPositions[i3] += dir.x * force;
-                    currentPositions[i3 + 1] += dir.y * force;
-                    currentPositions[i3 + 2] += dir.z * force;
+                    currentPositions[i3] += tempDir.x * force;
+                    currentPositions[i3 + 1] += tempDir.y * force;
+                    currentPositions[i3 + 2] += tempDir.z * force;
                 }
             }
 
@@ -201,27 +218,26 @@ const ParticleSystem = () => {
             let scale = 1;
             if (isPinching) scale = 1.2 + Math.sin(time * 20 + i) * 0.5; // Vibrate
 
-            DUMMY.position.set(currentPositions[i3], currentPositions[i3 + 1], currentPositions[i3 + 2]);
-            DUMMY.scale.set(scale, scale, scale);
-            DUMMY.updateMatrix();
-            meshRef.current.setMatrixAt(i, DUMMY.matrix);
+            dummy.position.set(currentPositions[i3], currentPositions[i3 + 1], currentPositions[i3 + 2]);
+            dummy.scale.set(scale, scale, scale);
+            dummy.updateMatrix();
+            meshRef.current.setMatrixAt(i, dummy.matrix);
 
             // Color update
-            const color = new THREE.Color();
             // Dynamic color based on time and position
             const hueBase = (time * 0.1) % 1;
 
-            if (targetShapeName === 'HEART') color.setHSL(0.95, 0.8, 0.6);
-            else if (targetShapeName === 'FLOWER') color.setHSL(0.8, 0.8, 0.6);
-            else if (targetShapeName === 'SATURN') color.setHSL(0.1, 0.8, 0.6);
-            else if (targetShapeName === 'FIREWORKS') color.setHSL((i / COUNT + time * 0.2) % 1, 0.8, 0.6);
-            else if (targetShapeName === 'DNA') color.setHSL((currentPositions[i3 + 1] * 0.1 + 0.5), 0.8, 0.6);
-            else if (targetShapeName === 'GALAXY') color.setHSL((i / COUNT * 0.5 + 0.5), 0.8, 0.6);
-            else color.setHSL(0.6, 0.8, 0.8);
+            if (targetShapeName === 'HEART') tempColor.setHSL(0.95, 0.8, 0.6);
+            else if (targetShapeName === 'FLOWER') tempColor.setHSL(0.8, 0.8, 0.6);
+            else if (targetShapeName === 'SATURN') tempColor.setHSL(0.1, 0.8, 0.6);
+            else if (targetShapeName === 'FIREWORKS') tempColor.setHSL((i / COUNT + time * 0.2) % 1, 0.8, 0.6);
+            else if (targetShapeName === 'DNA') tempColor.setHSL((currentPositions[i3 + 1] * 0.1 + 0.5), 0.8, 0.6);
+            else if (targetShapeName === 'GALAXY') tempColor.setHSL((i / COUNT * 0.5 + 0.5), 0.8, 0.6);
+            else tempColor.setHSL(0.6, 0.8, 0.8);
 
-            if (isPinching) color.setHSL((hueBase + 0.5) % 1, 1, 0.7); // Invert/Flash on pinch
+            if (isPinching) tempColor.setHSL((hueBase + 0.5) % 1, 1, 0.7); // Invert/Flash on pinch
 
-            meshRef.current.setColorAt(i, color);
+            meshRef.current.setColorAt(i, tempColor);
         }
         meshRef.current.instanceMatrix.needsUpdate = true;
         if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
@@ -229,7 +245,13 @@ const ParticleSystem = () => {
 
     return (
         <>
-            <instancedMesh ref={meshRef} args={[null, null, COUNT]}>
+            <instancedMesh
+                ref={meshRef}
+                args={[null, null, COUNT]}
+                position={shapePosition}
+                rotation={rotation}
+                scale={[zoom, zoom, zoom]}
+            >
                 <sphereGeometry args={[0.03, 16, 16]} />
                 <meshStandardMaterial
                     toneMapped={false}
