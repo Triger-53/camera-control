@@ -5,7 +5,7 @@ import { Hand, Zap, Move, Smartphone, Video, Monitor } from 'lucide-react'
 import './App.css'
 
 const UIOverlay = () => {
-  const { gesture, availableCameras, setCameraDeviceId, cameraDeviceId } = useStore();
+  const { gesture, isPinching, availableCameras, setCameraDeviceId, cameraDeviceId } = useStore();
   const [ipAddress, setIpAddress] = useState('localhost');
 
   useEffect(() => {

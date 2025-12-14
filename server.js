@@ -27,7 +27,8 @@ const io = new Server(httpServer, {
 import { exec, spawn } from 'child_process';
 
 // Spawn Swift Mouse Control Process
-const mouseProcess = spawn('swift', ['mouse_control.swift']);
+// Spawn Swift Mouse Control Process
+const mouseProcess = spawn('./mouse_control');
 
 mouseProcess.stdout.on('data', (data) => {
     console.log(`Mouse stdout: ${data}`);
