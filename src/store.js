@@ -46,6 +46,8 @@ const useStore = create((set, get) => ({
                 conn.on('data', (data) => {
                     if (data.type === 'CONTROL') {
                         get().sendControlCommand(data.action);
+                    } else if (data.type === 'MOUSE') {
+                        get().sendMouseData(data);
                     } else {
                         set(data);
                     }
@@ -96,6 +98,24 @@ const useStore = create((set, get) => ({
                 });
             } catch (err) {
                 console.error('Failed to send control command', err);
+            }
+        }
+    },
+
+    sendMouseData: (data) => {
+        const state = get();
+        // data: { type, x, y }
+
+        // If Controller, send to Host via PeerJS
+        if (state.mode === 'CONTROLLER' && state.conn) {
+            state.conn.send({ type: 'MOUSE', ...data });
+            return;
+        }
+
+        // If Host, send to Local Server via Socket
+        if (state.mode === 'HOST' || state.mode === 'STANDALONE') {
+            if (state.socket) {
+                state.socket.emit('mouse-data', data);
             }
         }
     },

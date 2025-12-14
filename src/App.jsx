@@ -1,30 +1,11 @@
-import React, { useState, useEffect, Suspense } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Html, useProgress } from '@react-three/drei'
+import React, { useState, useEffect } from 'react'
 import HandTracker from './components/HandTracker'
-import ParticleSystem from './components/ParticleSystem'
 import useStore from './store'
-import { Hand, Zap, Move, Smartphone, Loader2, Video } from 'lucide-react'
+import { Hand, Zap, Move, Smartphone, Video, Monitor } from 'lucide-react'
 import './App.css'
 
-function Loader() {
-  const { progress } = useProgress()
-  return (
-    <Html center>
-      <div style={{ color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-        <Loader2 className="spin" size={32} />
-        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px' }}>{progress.toFixed(0)}% loaded</div>
-      </div>
-      <style>{`
-        .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-    </Html>
-  )
-}
-
 const UIOverlay = () => {
-  const { gesture, isPinching, availableCameras, setCameraDeviceId, cameraDeviceId } = useStore();
+  const { gesture, availableCameras, setCameraDeviceId, cameraDeviceId } = useStore();
   const [ipAddress, setIpAddress] = useState('localhost');
 
   useEffect(() => {
@@ -41,7 +22,7 @@ const UIOverlay = () => {
   return (
     <div className="ui-overlay">
       <header>
-        <h1>Particle Gesture System</h1>
+        <h1>Device Control</h1>
         <div className="status-badge">
           <span className={`indicator ${gesture !== 'NONE' ? 'active' : ''}`}></span>
           {gesture === 'NONE' ? 'No Gesture' : gesture}
@@ -49,26 +30,36 @@ const UIOverlay = () => {
       </header>
 
       <div className="instructions-card">
-        <h3>1-Hand Controls</h3>
+        <h3>Mouse Control</h3>
         <div className={`instruction-item ${gesture === 'POINT' ? 'active' : ''}`}>
           <Hand size={20} />
-          <span><strong>Point</strong><br />Switch Shape</span>
+          <span><strong>Point</strong><br />Move Cursor</span>
         </div>
         <div className={`instruction-item ${isPinching ? 'active' : ''}`}>
           <Zap size={20} />
-          <span><strong>Pinch</strong><br />Drag Shape</span>
-        </div>
-        <div className={`instruction-item ${gesture === 'OPEN_PALM' ? 'active' : ''}`}>
-          <Move size={20} />
-          <span><strong>Open Palm</strong><br />Rotate (Move Hand)</span>
+          <span><strong>Pinch</strong><br />Click / Drag</span>
         </div>
         <div className="instruction-item">
           <Move size={20} />
-          <span><strong>Distance</strong><br />Zoom In/Out</span>
+          <span><strong>Middle Pinch</strong><br />Right Click</span>
         </div>
+        <div className="divider"></div>
+        <h3>Mac Gestures</h3>
+        <div className={`instruction-item ${gesture === 'SWIPE_LEFT' || gesture === 'SWIPE_RIGHT' ? 'active' : ''}`}>
+          <Monitor size={20} />
+          <span><strong>4 Fingers L/R</strong><br />Switch Space</span>
+        </div>
+        <div className={`instruction-item ${gesture === 'SWIPE_UP' ? 'active' : ''}`}>
+          <Monitor size={20} />
+          <span><strong>4 Fingers Up</strong><br />Mission Control</span>
+        </div>
+        <div className={`instruction-item ${gesture === 'SWIPE_DOWN' ? 'active' : ''}`}>
+          <Monitor size={20} />
+          <span><strong>4 Fingers Down</strong><br />App Expose</span>
+        </div>
+        <div className="divider"></div>
         <div className="instruction-item">
-          <Smartphone size={20} />
-          <span><strong>4 Fingers</strong><br />Mac Gestures</span>
+          <span className="note">Ensure Thumb is TUCKED for 4 fingers!</span>
         </div>
       </div>
 
@@ -145,7 +136,7 @@ const UIOverlay = () => {
                     padding: 20px;
                     border-radius: 16px;
                     border: 1px solid rgba(255, 255, 255, 0.1);
-                    width: 220px;
+                    width: 240px;
                 }
                 .instructions-card h3 {
                     margin: 0 0 16px 0;
@@ -173,6 +164,15 @@ const UIOverlay = () => {
                 .instruction-item span {
                     font-size: 0.9rem;
                     line-height: 1.2;
+                }
+                .divider {
+                    height: 1px;
+                    background: rgba(255,255,255,0.1);
+                    margin: 10px 0;
+                }
+                .note {
+                    font-size: 0.8rem;
+                    color: #ffaa00;
                 }
                 .bottom-controls {
                     display: flex;
@@ -209,17 +209,17 @@ function App() {
   if (mode === 'NONE') {
     return (
       <div className="mode-selection">
-        <h1>Particle Gesture System</h1>
+        <h1>Device Control</h1>
         <div className="card-container">
           <div className="card" onClick={() => setMode('STANDALONE')}>
             <div className="icon">💻</div>
             <h2>Standalone</h2>
-            <p>Use this device's camera & screen.</p>
+            <p>Use this device's camera.</p>
           </div>
           <div className="card" onClick={() => setMode('HOST')}>
             <div className="icon">🖥️</div>
             <h2>Desktop Host</h2>
-            <p>Display particles here. (Remote)</p>
+            <p>Receive commands here.</p>
           </div>
           <div className="card" onClick={() => setMode('CONTROLLER')}>
             <div className="icon">📱</div>
@@ -277,55 +277,41 @@ function App() {
 
       <UIOverlay />
 
-      {/* Show 3D Scene if Host OR Standalone */}
-      {(mode === 'HOST' || mode === 'STANDALONE') && (
-        <>
-          <Canvas camera={{ position: [0, 0, 6], fov: 50 }} dpr={[1, 1.5]}>
-            <color attach="background" args={['#050505']} />
-            <ambientLight intensity={0.2} />
-            <pointLight position={[10, 10, 10]} intensity={1} />
-            <Suspense fallback={<Loader />}>
-              <ParticleSystem />
-            </Suspense>
-            <OrbitControls enableZoom={false} enablePan={false} />
-          </Canvas>
-
-          {/* Host Connection Info */}
-          {mode === 'HOST' && (
-            <div className="connection-info">
-              <h3>Waiting for Controller...</h3>
-              <p>Enter this ID on your mobile:</p>
-              <div className="code">{peerId || 'Generating ID...'}</div>
-              {conn && <div className="status-connected">Controller Connected!</div>}
-              <style>{`
+      {/* Host Connection Info */}
+      {mode === 'HOST' && (
+        <div className="connection-info">
+          <h3>Waiting for Controller...</h3>
+          <p>Enter this ID on your mobile:</p>
+          <div className="code">{peerId || 'Generating ID...'}</div>
+          {conn && <div className="status-connected">Controller Connected!</div>}
+          <style>{`
                         .connection-info {
                             position: absolute;
-                            bottom: 40px;
+                            top: 50%;
                             left: 50%;
-                            transform: translateX(-50%);
+                            transform: translate(-50%, -50%);
                             background: rgba(0,0,0,0.8);
-                            padding: 20px;
-                            border-radius: 12px;
+                            padding: 40px;
+                            border-radius: 20px;
                             text-align: center;
                             color: white;
                             font-family: sans-serif;
                             border: 1px solid #333;
                         }
                         .code {
-                            font-size: 1.5rem;
+                            font-size: 2rem;
                             font-weight: bold;
                             color: #00ff88;
-                            margin: 10px 0;
+                            margin: 20px 0;
                             user-select: text;
                         }
                         .status-connected {
                             color: #00ff88;
                             margin-top: 10px;
+                            font-size: 1.2rem;
                         }
                     `}</style>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {mode === 'CONTROLLER' && !conn && (

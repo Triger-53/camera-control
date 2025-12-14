@@ -23,6 +23,26 @@ const io = new Server(httpServer, {
     }
 });
 
+// Device Control Endpoint
+import { exec, spawn } from 'child_process';
+
+// Spawn Swift Mouse Control Process
+const mouseProcess = spawn('swift', ['mouse_control.swift']);
+
+mouseProcess.stdout.on('data', (data) => {
+    console.log(`Mouse stdout: ${data}`);
+});
+
+mouseProcess.stderr.on('data', (data) => {
+    console.error(`Mouse stderr: ${data}`);
+});
+
+mouseProcess.on('close', (code) => {
+    console.log(`Mouse process exited with code ${code}`);
+});
+
+app.use(express.json());
+
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
@@ -37,19 +57,44 @@ io.on('connection', (socket) => {
     });
 
     socket.on('gesture-data', (data) => {
-        // Broadcast to all hosts
         io.to('host').emit('gesture-update', data);
+    });
+
+    // Handle Mouse Data Stream
+    socket.on('mouse-data', (data) => {
+        // data: { type: 'MOVE'|'DOWN'|'UP'|'DRAG', x, y }
+        if (!mouseProcess.stdin.writable) return;
+
+        const { type, x, y } = data;
+        let cmd = '';
+
+        switch (type) {
+            case 'MOVE':
+                cmd = `m ${x} ${y}\n`;
+                break;
+            case 'DOWN':
+                cmd = `l\n`;
+                break;
+            case 'UP':
+                cmd = `u\n`;
+                break;
+            case 'DRAG':
+                cmd = `d ${x} ${y}\n`;
+                break;
+            case 'RIGHT_CLICK':
+                cmd = `r\n`;
+                break;
+        }
+
+        if (cmd) {
+            mouseProcess.stdin.write(cmd);
+        }
     });
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
     });
 });
-
-// Device Control Endpoint
-import { exec } from 'child_process';
-
-app.use(express.json());
 
 app.post('/api/control', (req, res) => {
     const { action } = req.body;

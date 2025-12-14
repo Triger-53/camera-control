@@ -125,26 +125,36 @@ const HandTracker = () => {
                         isExtended(pinkyTip, wrist)
                     ];
 
-                    const isOpenPalm = fingersExtended.every(f => f) && !isPinching;
+                    // Thumb Extension Check (Distance from wrist compared to Index MCP)
+                    // Or simply distance from wrist > threshold, but thumb is shorter.
+                    // Better: Check angle or distance from Index MCP.
+                    // Simple: Distance from wrist > 0.15 (similar to others but shorter threshold)
+                    const isThumbExtended = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y) > 0.15;
+
+                    const areFourFingersExtended = fingersExtended.every(f => f);
+
+                    // STRICT CHECK: 4 Fingers = 4 Extended AND Thumb NOT Extended
+                    const isFourFingers = areFourFingersExtended && !isThumbExtended;
+
+                    // STRICT CHECK: Open Palm = 4 Extended AND Thumb Extended
+                    const isOpenPalm = areFourFingersExtended && isThumbExtended && !isPinching;
+
                     const isPointing = fingersExtended[0] && !fingersExtended[1] && !fingersExtended[2] && !fingersExtended[3];
-                    const isFourFingers = fingersExtended.every(f => f); // Thumb doesn't matter as much, but usually open palm
 
                     let gesture = 'NONE';
                     if (isPinching) gesture = 'PINCH';
                     else if (isPointing) gesture = 'POINT';
+                    else if (isFourFingers) gesture = 'FOUR_FINGERS';
                     else if (isOpenPalm) gesture = 'OPEN_PALM';
 
                     // 3. Device Control (4 Finger Swipe)
-                    // We need to track velocity or delta of the hand center
                     if (isFourFingers) {
                         const dx = x - previousPosition.current[0]; // Delta X
                         const dy = y - previousPosition.current[1]; // Delta Y
 
                         // Threshold for swipe
-                        const swipeThreshold = 0.05;
+                        const swipeThreshold = 0.04; // Slightly more sensitive
                         const now = Date.now();
-                        const lastSwipe = lastVideoTimeRef.current * 1000; // Reuse this or add new state?
-                        // Let's use a new ref for debounce
 
                         if (!window.lastSwipeTime) window.lastSwipeTime = 0;
 
@@ -156,8 +166,6 @@ const HandTracker = () => {
                                 useStore.getState().sendControlCommand('SWIPE_LEFT');
                                 window.lastSwipeTime = now;
                             } else if (dy > swipeThreshold) {
-                                // Inverted Y? Hand up = Y up? 
-                                // In our coords, Y is up.
                                 useStore.getState().sendControlCommand('SWIPE_UP');
                                 window.lastSwipeTime = now;
                             } else if (dy < -swipeThreshold) {
@@ -167,39 +175,73 @@ const HandTracker = () => {
                         }
                     }
 
-                    // 4. One-Handed Control Logic
-                    let rotation = [0, 0, 0];
-                    let zoom = 1;
-                    let shapePosition = [0, 0, 0];
+                    // 4. Mouse Control Logic
+                    // Screen Resolution (Hardcoded for now, or configurable)
+                    const SCREEN_W = 1920;
+                    const SCREEN_H = 1080;
 
-                    // Zoom based on Hand Size (Wrist to Middle Tip)
-                    // Normal size approx 0.3?
-                    const handSize = Math.hypot(middleTip.x - wrist.x, middleTip.y - wrist.y);
-                    const baseSize = 0.25;
-                    // Map size to zoom: Larger hand (closer) = Zoom In (Scale Up)
-                    // Let's clamp it
-                    const rawZoom = Math.max(0.5, Math.min(3.0, handSize / baseSize));
-                    zoom = rawZoom;
+                    // Map Hand Coordinates (-1..1) to Screen (0..W, 0..H)
+                    // Hand X: -1 (Left) to 1 (Right) -> 0 to W
+                    // Hand Y: -1 (Bottom) to 1 (Top) -> H to 0 (Inverted Y)
 
-                    if (isPinching) {
-                        // Drag Mode
-                        shapePosition = [x, y, 0];
-                    } else if (isOpenPalm && !isFourFingers) {
-                        // Rotate Mode (Only if NOT swiping)
-                        // Actually isOpenPalm IS 4 fingers usually. 
-                        // Let's say Rotate is slow movement, Swipe is fast.
-                        // For now, let's keep Rotate but Swipe overrides if fast.
-                        rotation = [y, -x, 0];
+                    // Use Index Tip for precise pointing
+                    // Raw Index Tip is 0..1 in video frame
+                    const ix = indexTip.x;
+                    const iy = indexTip.y;
+
+                    // Map 0..1 to Screen
+                    // Mirror X for natural feel (Camera is mirrored usually)
+                    const screenX = (1 - ix) * SCREEN_W;
+                    const screenY = iy * SCREEN_H;
+
+                    // Gestures for Mouse
+                    // Move: Index Extended, others closed (Pointing)
+                    // Left Click/Drag: Pinch (Index + Thumb)
+                    // Right Click: Middle Pinch (Middle + Thumb)
+
+                    const isIndexPinch = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y) < 0.05;
+                    const isMiddlePinch = Math.hypot(middleTip.x - thumbTip.x, middleTip.y - thumbTip.y) < 0.05;
+
+                    // State for Dragging
+                    if (!window.isDragging) window.isDragging = false;
+
+                    if (isIndexPinch) {
+                        // Dragging or Clicking
+                        if (!window.isDragging) {
+                            // Just started pinching -> Down
+                            useStore.getState().sendMouseData({ type: 'DOWN', x: screenX, y: screenY });
+                            window.isDragging = true;
+                        } else {
+                            // Continue dragging
+                            useStore.getState().sendMouseData({ type: 'DRAG', x: screenX, y: screenY });
+                        }
+                    } else {
+                        // Not pinching
+                        if (window.isDragging) {
+                            // Just released -> Up
+                            useStore.getState().sendMouseData({ type: 'UP', x: screenX, y: screenY });
+                            window.isDragging = false;
+                        } else if (isPointing) {
+                            // Just Moving
+                            useStore.getState().sendMouseData({ type: 'MOVE', x: screenX, y: screenY });
+                        }
+                    }
+
+                    // Right Click (Middle Pinch) - Debounced
+                    if (isMiddlePinch) {
+                        const now = Date.now();
+                        if (!window.lastRightClick) window.lastRightClick = 0;
+                        if (now - window.lastRightClick > 1000) {
+                            useStore.getState().sendMouseData({ type: 'RIGHT_CLICK', x: screenX, y: screenY });
+                            window.lastRightClick = now;
+                        }
                     }
 
                     setHandData({
                         handPosition: [x, y, z],
                         isPinching,
                         isOpenPalm,
-                        gesture,
-                        rotation,
-                        zoom,
-                        shapePosition
+                        gesture
                     });
                 }
             }
