@@ -44,7 +44,11 @@ const useStore = create((set, get) => ({
                 console.log('Controller connected');
                 set({ conn });
                 conn.on('data', (data) => {
-                    set(data);
+                    if (data.type === 'CONTROL') {
+                        get().sendControlCommand(data.action);
+                    } else {
+                        set(data);
+                    }
                 });
             });
         }
@@ -71,6 +75,29 @@ const useStore = create((set, get) => ({
             // Update local state (for Standalone or local feedback)
             return { ...state, ...data };
         });
+    },
+
+    sendControlCommand: async (action) => {
+        const state = get();
+
+        // If Controller, send to Host
+        if (state.mode === 'CONTROLLER' && state.conn) {
+            state.conn.send({ type: 'CONTROL', action });
+            return;
+        }
+
+        // If Host or Standalone, execute locally
+        if (state.mode === 'HOST' || state.mode === 'STANDALONE') {
+            try {
+                await fetch('/api/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+            } catch (err) {
+                console.error('Failed to send control command', err);
+            }
+        }
     },
 }))
 

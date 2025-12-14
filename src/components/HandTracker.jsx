@@ -127,13 +127,47 @@ const HandTracker = () => {
 
                     const isOpenPalm = fingersExtended.every(f => f) && !isPinching;
                     const isPointing = fingersExtended[0] && !fingersExtended[1] && !fingersExtended[2] && !fingersExtended[3];
+                    const isFourFingers = fingersExtended.every(f => f); // Thumb doesn't matter as much, but usually open palm
 
                     let gesture = 'NONE';
                     if (isPinching) gesture = 'PINCH';
-                    else if (isOpenPalm) gesture = 'OPEN_PALM';
                     else if (isPointing) gesture = 'POINT';
+                    else if (isOpenPalm) gesture = 'OPEN_PALM';
 
-                    // 3. One-Handed Control Logic
+                    // 3. Device Control (4 Finger Swipe)
+                    // We need to track velocity or delta of the hand center
+                    if (isFourFingers) {
+                        const dx = x - previousPosition.current[0]; // Delta X
+                        const dy = y - previousPosition.current[1]; // Delta Y
+
+                        // Threshold for swipe
+                        const swipeThreshold = 0.05;
+                        const now = Date.now();
+                        const lastSwipe = lastVideoTimeRef.current * 1000; // Reuse this or add new state?
+                        // Let's use a new ref for debounce
+
+                        if (!window.lastSwipeTime) window.lastSwipeTime = 0;
+
+                        if (now - window.lastSwipeTime > 500) {
+                            if (dx > swipeThreshold) {
+                                useStore.getState().sendControlCommand('SWIPE_RIGHT');
+                                window.lastSwipeTime = now;
+                            } else if (dx < -swipeThreshold) {
+                                useStore.getState().sendControlCommand('SWIPE_LEFT');
+                                window.lastSwipeTime = now;
+                            } else if (dy > swipeThreshold) {
+                                // Inverted Y? Hand up = Y up? 
+                                // In our coords, Y is up.
+                                useStore.getState().sendControlCommand('SWIPE_UP');
+                                window.lastSwipeTime = now;
+                            } else if (dy < -swipeThreshold) {
+                                useStore.getState().sendControlCommand('SWIPE_DOWN');
+                                window.lastSwipeTime = now;
+                            }
+                        }
+                    }
+
+                    // 4. One-Handed Control Logic
                     let rotation = [0, 0, 0];
                     let zoom = 1;
                     let shapePosition = [0, 0, 0];
@@ -150,10 +184,11 @@ const HandTracker = () => {
                     if (isPinching) {
                         // Drag Mode
                         shapePosition = [x, y, 0];
-                    } else if (isOpenPalm) {
-                        // Rotate Mode (Map Position to Angle)
-                        // X pos -> Rotate Y
-                        // Y pos -> Rotate X
+                    } else if (isOpenPalm && !isFourFingers) {
+                        // Rotate Mode (Only if NOT swiping)
+                        // Actually isOpenPalm IS 4 fingers usually. 
+                        // Let's say Rotate is slow movement, Swipe is fast.
+                        // For now, let's keep Rotate but Swipe overrides if fast.
                         rotation = [y, -x, 0];
                     }
 

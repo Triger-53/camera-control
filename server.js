@@ -46,6 +46,48 @@ io.on('connection', (socket) => {
     });
 });
 
+// Device Control Endpoint
+import { exec } from 'child_process';
+
+app.use(express.json());
+
+app.post('/api/control', (req, res) => {
+    const { action } = req.body;
+    console.log('Executing control action:', action);
+
+    let script = '';
+
+    // Mac Shortcuts
+    switch (action) {
+        case 'SWIPE_LEFT':
+            // Ctrl + Left Arrow (Previous Space)
+            script = `tell application "System Events" to key code 123 using control down`;
+            break;
+        case 'SWIPE_RIGHT':
+            // Ctrl + Right Arrow (Next Space)
+            script = `tell application "System Events" to key code 124 using control down`;
+            break;
+        case 'SWIPE_UP':
+            // Ctrl + Up Arrow (Mission Control)
+            script = `tell application "System Events" to key code 126 using control down`;
+            break;
+        case 'SWIPE_DOWN':
+            // Ctrl + Down Arrow (App Expose)
+            script = `tell application "System Events" to key code 125 using control down`;
+            break;
+        default:
+            return res.status(400).json({ error: 'Unknown action' });
+    }
+
+    exec(`osascript -e '${script}'`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`exec error: ${error}`);
+            return res.status(500).json({ error: 'Command failed' });
+        }
+        res.json({ success: true });
+    });
+});
+
 const PORT = 3000;
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Socket server running on port ${PORT}`);

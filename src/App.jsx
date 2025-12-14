@@ -66,6 +66,10 @@ const UIOverlay = () => {
           <Move size={20} />
           <span><strong>Distance</strong><br />Zoom In/Out</span>
         </div>
+        <div className="instruction-item">
+          <Smartphone size={20} />
+          <span><strong>4 Fingers</strong><br />Mac Gestures</span>
+        </div>
       </div>
 
       <div className="bottom-controls">
