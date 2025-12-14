@@ -280,37 +280,120 @@ function App() {
       {/* Host Connection Info */}
       {mode === 'HOST' && (
         <div className="connection-info">
-          <h3>Waiting for Controller...</h3>
-          <p>Enter this ID on your mobile:</p>
-          <div className="code">{peerId || 'Generating ID...'}</div>
-          {conn && <div className="status-connected">Controller Connected!</div>}
+          <h2>🖥️ Desktop Host</h2>
+          <p className="subtext">Run <code>node server.js</code> to enable Mouse Control</p>
+
+          <div className="id-container">
+            <p>Mobile Connection Code:</p>
+            <div className="code-display">
+              {peerId ? (
+                <>
+                  <span className="code-text">{peerId}</span>
+                  <button className="copy-btn" onClick={() => navigator.clipboard.writeText(peerId)}>
+                    Copy
+                  </button>
+                </>
+              ) : (
+                <span className="loading">Generating Code...</span>
+              )}
+            </div>
+          </div>
+
+          {conn ? (
+            <div className="status-connected">
+              <div className="dot"></div>
+              Controller Connected
+            </div>
+          ) : (
+            <div className="status-waiting">
+              <div className="spinner"></div>
+              Waiting for Mobile...
+            </div>
+          )}
+
           <style>{`
-                        .connection-info {
-                            position: absolute;
-                            top: 50%;
-                            left: 50%;
-                            transform: translate(-50%, -50%);
-                            background: rgba(0,0,0,0.8);
-                            padding: 40px;
-                            border-radius: 20px;
-                            text-align: center;
-                            color: white;
-                            font-family: sans-serif;
-                            border: 1px solid #333;
-                        }
-                        .code {
-                            font-size: 2rem;
-                            font-weight: bold;
-                            color: #00ff88;
-                            margin: 20px 0;
-                            user-select: text;
-                        }
-                        .status-connected {
-                            color: #00ff88;
-                            margin-top: 10px;
-                            font-size: 1.2rem;
-                        }
-                    `}</style>
+            .connection-info {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(20, 20, 20, 0.9);
+                backdrop-filter: blur(20px);
+                padding: 50px;
+                border-radius: 24px;
+                text-align: center;
+                color: white;
+                font-family: 'Inter', sans-serif;
+                border: 1px solid rgba(255,255,255,0.1);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+                min-width: 400px;
+            }
+            h2 { margin: 0 0 10px 0; font-size: 2rem; }
+            .subtext { color: #888; margin-bottom: 30px; font-size: 0.9rem; }
+            .id-container {
+                background: rgba(255,255,255,0.05);
+                padding: 20px;
+                border-radius: 16px;
+                margin-bottom: 30px;
+            }
+            .code-display {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 15px;
+                margin-top: 10px;
+            }
+            .code-text {
+                font-family: monospace;
+                font-size: 2rem;
+                font-weight: 700;
+                color: #00ff88;
+                letter-spacing: 2px;
+            }
+            .copy-btn {
+                background: rgba(255,255,255,0.1);
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .copy-btn:hover { background: rgba(255,255,255,0.2); }
+            
+            .status-connected {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                color: #00ff88;
+                font-weight: 600;
+                font-size: 1.2rem;
+            }
+            .dot {
+                width: 10px;
+                height: 10px;
+                background: #00ff88;
+                border-radius: 50%;
+                box-shadow: 0 0 10px #00ff88;
+            }
+            .status-waiting {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                color: #888;
+            }
+            .spinner {
+                width: 20px;
+                height: 20px;
+                border: 2px solid #888;
+                border-top-color: transparent;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          `}</style>
         </div>
       )}
 

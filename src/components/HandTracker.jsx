@@ -292,7 +292,7 @@ const HandTracker = () => {
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
-            opacity: 0.6; /* Dim slightly so particles pop */
+            opacity: 1; /* Dim slightly so particles pop */
         }
         .loading-text {
             position: absolute;
