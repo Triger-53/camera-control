@@ -6,6 +6,7 @@ const useStore = create((set, get) => ({
     isPinching: false,
     isOpenPalm: false,
     gesture: 'NONE',
+    debug: {}, // Debug data for gestures
     mode: 'NONE', // 'HOST', 'CONTROLLER', 'STANDALONE'
     peer: null,
     conn: null,

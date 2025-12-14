@@ -12,3 +12,23 @@ body {
   overflow: hidden;
   background-color: #111;
 }
+
+.debug-info {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: #aaa;
+}
+.debug-row span:last-child {
+  color: white;
+  font-weight: bold;
+}
+.debug-row span.good { color: #00ff88 !important; }
+.debug-row span.bad { color: #ff4444 !important; }

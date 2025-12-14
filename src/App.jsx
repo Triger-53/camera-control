@@ -61,6 +61,16 @@ const UIOverlay = () => {
         <div className="instruction-item">
           <span className="note">Ensure Thumb is TUCKED for 4 fingers!</span>
         </div>
+
+        {/* Debug Info */}
+        <div className="debug-info">
+          <div className="debug-row"><span>Thumb:</span> <span className={useStore.getState().debug?.thumb === 'TUCK' ? 'good' : 'bad'}>{useStore.getState().debug?.thumb || '-'}</span></div>
+          <div className="debug-row"><span>Index:</span> <span>{useStore.getState().debug?.index || '-'}</span></div>
+          <div className="debug-row"><span>Middle:</span> <span>{useStore.getState().debug?.middle || '-'}</span></div>
+          <div className="debug-row"><span>Ring:</span> <span>{useStore.getState().debug?.ring || '-'}</span></div>
+          <div className="debug-row"><span>Pinky:</span> <span>{useStore.getState().debug?.pinky || '-'}</span></div>
+          <div className="debug-row"><span>T-Dist:</span> <span>{useStore.getState().debug?.thumbDist || '-'}</span></div>
+        </div>
       </div>
 
       <div className="bottom-controls">

@@ -102,21 +102,33 @@ const HandTracker = () => {
                     // Helper: Finger Extension
                     const isExtended = (tip, base) => Math.hypot(tip.x - base.x, tip.y - base.y) > 0.1;
 
-                    // 1. Position (Center of Palm approx)
-                    // Map 0..1 to -1..1 range
-                    const rawX = (indexTip.x - 0.5) * -2.5;
-                    const rawY = -(indexTip.y - 0.5) * 2.5;
+                    // Refined Thumb Check
+                    // Check distance between Thumb Tip and Pinky MCP (base of pinky)
+                    // If far, it's extended. If close, it's tucked.
+                    // Or check distance to Index MCP.
+                    // Let's use a simpler check: Distance from Wrist.
+                    // But Thumb is short.
+                    // Let's use X-axis distance for "Open" vs "Closed" relative to palm? No, rotation matters.
 
-                    // Smoothing Position
-                    const smoothFactor = 0.2;
-                    const x = lerp(previousPosition.current[0], rawX, smoothFactor);
-                    const y = lerp(previousPosition.current[1], rawY, smoothFactor);
-                    const z = 0;
-                    previousPosition.current = [x, y, z];
+                    // Better Thumb Check: Angle between Thumb-Wrist and Index-Wrist?
+                    // Let's stick to distance but tune it, or check against Index MCP.
+                    const indexMCP = hand[5];
+                    const pinkyMCP = hand[17];
 
-                    // 2. Gesture Detection
-                    const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-                    const isPinching = pinchDist < 0.06;
+                    // Distance from Thumb Tip to Pinky MCP is large when open, small when tucked across palm.
+                    const thumbToPinkyDist = Math.hypot(thumbTip.x - pinkyMCP.x, thumbTip.y - pinkyMCP.y);
+                    const isThumbExtended = thumbToPinkyDist > 0.15; // Tuned threshold
+
+                    // Debug Data
+                    const debugData = {
+                        thumb: isThumbExtended ? 'EXT' : 'TUCK',
+                        index: isExtended(indexTip, wrist) ? 'EXT' : 'FOLD',
+                        middle: isExtended(middleTip, wrist) ? 'EXT' : 'FOLD',
+                        ring: isExtended(ringTip, wrist) ? 'EXT' : 'FOLD',
+                        pinky: isExtended(pinkyTip, wrist) ? 'EXT' : 'FOLD',
+                        thumbDist: thumbToPinkyDist.toFixed(2)
+                    };
+                    window.debugHand = debugData; // Expose for console if needed
 
                     const fingersExtended = [
                         isExtended(indexTip, wrist),
@@ -124,12 +136,6 @@ const HandTracker = () => {
                         isExtended(ringTip, wrist),
                         isExtended(pinkyTip, wrist)
                     ];
-
-                    // Thumb Extension Check (Distance from wrist compared to Index MCP)
-                    // Or simply distance from wrist > threshold, but thumb is shorter.
-                    // Better: Check angle or distance from Index MCP.
-                    // Simple: Distance from wrist > 0.15 (similar to others but shorter threshold)
-                    const isThumbExtended = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y) > 0.15;
 
                     const areFourFingersExtended = fingersExtended.every(f => f);
 
@@ -146,6 +152,26 @@ const HandTracker = () => {
                     else if (isPointing) gesture = 'POINT';
                     else if (isFourFingers) gesture = 'FOUR_FINGERS';
                     else if (isOpenPalm) gesture = 'OPEN_PALM';
+
+                    // Update Debug in Store (optional, or just use local state for overlay)
+                    // For now, let's just log it or show in a small overlay if we can.
+                    // We'll pass it to setHandData to show in UI.
+
+                    // 1. Position (Center of Palm approx)
+                    // Map 0..1 to -1..1 range
+                    const rawX = (indexTip.x - 0.5) * -2.5;
+                    const rawY = -(indexTip.y - 0.5) * 2.5;
+
+                    // Smoothing Position
+                    const smoothFactor = 0.2;
+                    const x = lerp(previousPosition.current[0], rawX, smoothFactor);
+                    const y = lerp(previousPosition.current[1], rawY, smoothFactor);
+                    const z = 0;
+                    previousPosition.current = [x, y, z];
+
+                    // 2. Gesture Detection
+                    const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                    const isPinching = pinchDist < 0.06;
 
                     // 3. Device Control (4 Finger Swipe)
                     if (isFourFingers) {
