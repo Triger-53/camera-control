@@ -142,11 +142,14 @@ const ParticleSystem = () => {
     }, [positions, currentPositions]);
 
     // Handle gesture shape switching
+    const [lastSwitchTime, setLastSwitchTime] = useState(0);
     useEffect(() => {
-        if (gesture === 'OPEN_PALM') {
+        const now = Date.now();
+        if (gesture === 'POINT' && now - lastSwitchTime > 1000) {
             setShapeIndex((prev) => (prev + 1) % shapes.length);
+            setLastSwitchTime(now);
         }
-    }, [gesture]);
+    }, [gesture, lastSwitchTime]);
 
     // Reusable objects to avoid GC
     const dummy = useMemo(() => new THREE.Object3D(), []);

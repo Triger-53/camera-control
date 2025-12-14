@@ -27,7 +27,7 @@ const HandTracker = () => {
                         delegate: 'GPU',
                     },
                     runningMode: 'VIDEO',
-                    numHands: 2,
+                    numHands: 1,
                 });
                 console.log('HandLandmarker initialized');
                 setLoading(false);
@@ -89,76 +89,72 @@ const HandTracker = () => {
                 const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
 
                 if (results.landmarks && results.landmarks.length > 0) {
-                    const hands = results.landmarks;
-                    const hand1 = hands[0];
-                    const hand2 = hands.length > 1 ? hands[1] : null;
+                    const hand = results.landmarks[0];
 
-                    // Helper to get position
-                    const getPos = (hand) => {
-                        const index = hand[8];
-                        return {
-                            x: (index.x - 0.5) * -2.5,
-                            y: -(index.y - 0.5) * 2.5
-                        };
-                    };
+                    // Key Landmarks
+                    const wrist = hand[0];
+                    const thumbTip = hand[4];
+                    const indexTip = hand[8];
+                    const middleTip = hand[12];
+                    const ringTip = hand[16];
+                    const pinkyTip = hand[20];
 
-                    const h1Pos = getPos(hand1);
+                    // Helper: Finger Extension
+                    const isExtended = (tip, base) => Math.hypot(tip.x - base.x, tip.y - base.y) > 0.1;
 
-                    // 1. Hand Position (Primary)
+                    // 1. Position (Center of Palm approx)
+                    // Map 0..1 to -1..1 range
+                    const rawX = (indexTip.x - 0.5) * -2.5;
+                    const rawY = -(indexTip.y - 0.5) * 2.5;
+
+                    // Smoothing Position
                     const smoothFactor = 0.2;
-                    const x = lerp(previousPosition.current[0], h1Pos.x, smoothFactor);
-                    const y = lerp(previousPosition.current[1], h1Pos.y, smoothFactor);
+                    const x = lerp(previousPosition.current[0], rawX, smoothFactor);
+                    const y = lerp(previousPosition.current[1], rawY, smoothFactor);
                     const z = 0;
                     previousPosition.current = [x, y, z];
 
-                    // 2. Pinch Detection (Primary Hand)
-                    const indexTip = hand1[8];
-                    const thumbTip = hand1[4];
+                    // 2. Gesture Detection
                     const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
                     const isPinching = pinchDist < 0.06;
 
-                    // 3. Open Palm (Primary Hand)
-                    const wrist = hand1[0];
-                    const isFingerExtended = (tip, wrist) => Math.hypot(tip.x - wrist.x, tip.y - wrist.y) > 0.15;
-                    const isOpenPalm = isFingerExtended(hand1[8], wrist) &&
-                        isFingerExtended(hand1[12], wrist) &&
-                        isFingerExtended(hand1[16], wrist) &&
-                        isFingerExtended(hand1[20], wrist) &&
-                        !isPinching;
+                    const fingersExtended = [
+                        isExtended(indexTip, wrist),
+                        isExtended(middleTip, wrist),
+                        isExtended(ringTip, wrist),
+                        isExtended(pinkyTip, wrist)
+                    ];
+
+                    const isOpenPalm = fingersExtended.every(f => f) && !isPinching;
+                    const isPointing = fingersExtended[0] && !fingersExtended[1] && !fingersExtended[2] && !fingersExtended[3];
 
                     let gesture = 'NONE';
                     if (isPinching) gesture = 'PINCH';
                     else if (isOpenPalm) gesture = 'OPEN_PALM';
+                    else if (isPointing) gesture = 'POINT';
 
-                    // 4. Multi-Hand Gestures (Zoom, Rotate, Drag)
+                    // 3. One-Handed Control Logic
                     let rotation = [0, 0, 0];
                     let zoom = 1;
                     let shapePosition = [0, 0, 0];
 
-                    if (hand2) {
-                        // Two Hands: Zoom & Rotate
-                        const h2Pos = getPos(hand2);
+                    // Zoom based on Hand Size (Wrist to Middle Tip)
+                    // Normal size approx 0.3?
+                    const handSize = Math.hypot(middleTip.x - wrist.x, middleTip.y - wrist.y);
+                    const baseSize = 0.25;
+                    // Map size to zoom: Larger hand (closer) = Zoom In (Scale Up)
+                    // Let's clamp it
+                    const rawZoom = Math.max(0.5, Math.min(3.0, handSize / baseSize));
+                    zoom = rawZoom;
 
-                        // Distance -> Zoom
-                        const dist = Math.hypot(h1Pos.x - h2Pos.x, h1Pos.y - h2Pos.y);
-                        zoom = Math.max(0.5, Math.min(3, dist * 2)); // Map distance to zoom
-
-                        // Angle -> Rotation Z
-                        const angle = Math.atan2(h2Pos.y - h1Pos.y, h2Pos.x - h1Pos.x);
-                        rotation = [0, 0, angle];
-
-                        // Midpoint -> Position
-                        shapePosition = [
-                            (h1Pos.x + h2Pos.x) / 2,
-                            (h1Pos.y + h2Pos.y) / 2,
-                            0
-                        ];
-                    } else {
-                        // One Hand
-                        if (isPinching) {
-                            // Drag Mode
-                            shapePosition = [x, y, 0];
-                        }
+                    if (isPinching) {
+                        // Drag Mode
+                        shapePosition = [x, y, 0];
+                    } else if (isOpenPalm) {
+                        // Rotate Mode (Map Position to Angle)
+                        // X pos -> Rotate Y
+                        // Y pos -> Rotate X
+                        rotation = [y, -x, 0];
                     }
 
                     setHandData({

@@ -49,18 +49,22 @@ const UIOverlay = () => {
       </header>
 
       <div className="instructions-card">
-        <h3>Controls</h3>
-        <div className={`instruction-item ${gesture === 'OPEN_PALM' ? 'active' : ''}`}>
+        <h3>1-Hand Controls</h3>
+        <div className={`instruction-item ${gesture === 'POINT' ? 'active' : ''}`}>
           <Hand size={20} />
-          <span><strong>Open Palm</strong><br />Switch Shape</span>
+          <span><strong>Point</strong><br />Switch Shape</span>
         </div>
         <div className={`instruction-item ${isPinching ? 'active' : ''}`}>
           <Zap size={20} />
-          <span><strong>1 Hand Pinch</strong><br />Drag & Swirl</span>
+          <span><strong>Pinch</strong><br />Drag Shape</span>
+        </div>
+        <div className={`instruction-item ${gesture === 'OPEN_PALM' ? 'active' : ''}`}>
+          <Move size={20} />
+          <span><strong>Open Palm</strong><br />Rotate (Move Hand)</span>
         </div>
         <div className="instruction-item">
           <Move size={20} />
-          <span><strong>2 Hands</strong><br />Zoom & Rotate</span>
+          <span><strong>Distance</strong><br />Zoom In/Out</span>
         </div>
       </div>
 
