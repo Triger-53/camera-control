@@ -3,7 +3,7 @@ import { DEFAULT_AUDIO_CONFIG, pcmToGeminiBlob, decodeAudioData } from './audioU
 
 // NOTE: In a real production app, this key should be proxied via backend.
 // For this local desktop agent, we use the env var directly.
-const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || "AIzaSyCxm4MLjlP4_GdPEi1JuOGW7tgm4mlf3ng";
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 export class GeminiLiveClient {
     constructor(logCallback, statusCallback, volumeCallback) {

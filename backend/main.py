@@ -20,8 +20,7 @@ from PIL import Image
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
-    # Fallback to hardcoded key for now as requested, but prioritize environment
-    GOOGLE_API_KEY = "AIzaSyCxm4MLjlP4_GdPEi1JuOGW7tgm4mlf3ng"
+    raise ValueError("GOOGLE_API_KEY not found. Please set it in your .env file.")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 

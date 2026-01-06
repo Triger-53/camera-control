@@ -3,7 +3,9 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyCxm4MLjlP4_GdPEi1JuOGW7tgm4mlf3ng")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found in environment.")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 print("Listing models...")
