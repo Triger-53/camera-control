@@ -5,6 +5,7 @@ import LiveControl from './components/LiveControl';
 
 function App() {
   const [logs, setLogs] = useState([]);
+  const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
 
   const handleCommand = async (command) => {
     addLog(`User: ${command}`);
@@ -17,13 +18,30 @@ function App() {
       });
       const data = await response.json();
       addLog(`Agent: ${JSON.stringify(data)}`);
+      setBackendStatus('online');
     } catch (error) {
       addLog(`Error: ${error.message}`);
+      setBackendStatus('offline');
     }
   };
 
   const addLog = React.useCallback((message) => {
     setLogs((prev) => [{ timestamp: new Date().toLocaleTimeString(), message }, ...prev]);
+  }, []);
+
+  React.useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
+        await fetch(`${baseUrl}/screenshot`);
+        setBackendStatus('online');
+      } catch (e) {
+        setBackendStatus('offline');
+      }
+    };
+    checkBackend();
+    const interval = setInterval(checkBackend, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -46,10 +64,40 @@ function App() {
               Device Agent
             </h1>
           </div>
-          <div className="text-sm text-gray-400 bg-white/5 px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-            v2.5 Audio Preview
+          <div className="flex items-center gap-4">
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${backendStatus === 'online' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+              backendStatus === 'offline' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+              }`}>
+              <div className={`w-2 h-2 rounded-full ${backendStatus === 'online' ? 'bg-green-500 animate-pulse' :
+                backendStatus === 'offline' ? 'bg-red-500' :
+                  'bg-yellow-500 animate-bounce'
+                }`}></div>
+              {backendStatus === 'online' ? 'Backend Live' : backendStatus === 'offline' ? 'Backend Offline' : 'Checking Backend...'}
+            </div>
+            <div className="text-sm text-gray-400 bg-white/5 px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
+              v2.5 Audio Preview
+            </div>
           </div>
         </header>
+
+        {backendStatus === 'offline' && window.location.protocol === 'https:' && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
+            <div className="text-red-400 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="text-sm">
+              <p className="text-red-300 font-semibold mb-1">Vercel (HTTPS) cannot connect to local backend (HTTP).</p>
+              <p className="text-gray-400">
+                To fix this: <br />
+                1. Run everything locally at <code className="text-purple-400">http://localhost:5173</code> OR <br />
+                2. Use <code className="text-purple-400">ngrok http 8000</code> and set the <code className="text-purple-400">VITE_API_URL</code> to the ngrok link.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
           {/* Main Content Area */}
