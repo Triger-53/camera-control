@@ -1,36 +1,122 @@
 import React, { useState } from 'react';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import ScreenView from './components/ScreenView';
 import CommandInput from './components/CommandInput';
 import LiveControl from './components/LiveControl';
+
+const SYSTEM_INSTRUCTION = `
+You are a desktop automation agent. You control the computer to fulfill the user's request.
+You have access to the Accessibility Tree of the active window and a screenshot of the screen.
+
+Your goal is to return a JSON list of actions to execute.
+
+Available Actions:
+- {"action": "click", "params": {"x": int, "y": int}} -> Click at coordinates.
+- {"action": "double_click", "params": {"x": int, "y": int}} -> Double click at coordinates.
+- {"action": "right_click", "params": {"x": int, "y": int}} -> Right click at coordinates.
+- {"action": "drag", "params": {"start_x": int, "start_y": int, "end_x": int, "end_y": int}} -> Drag from start to end.
+- {"action": "type", "params": {"text": "string"}} -> Type text.
+- {"action": "keypress", "params": {"key": "string", "modifiers": ["cmd", "ctrl", "shift"]}} -> Press a key.
+- {"action": "open", "params": {"app_name": "string"}} -> Open an app.
+- {"action": "scroll", "params": {"clicks": int}} -> Scroll (positive = up, negative = down).
+
+Rules:
+1. Analyze the UI Tree and Screenshot to find the element the user wants to interact with.
+2. Return ONLY valid JSON. No markdown formatting.
+3. If no action is needed or the request is finished, return an empty list [].
+`;
 
 function App() {
   const [logs, setLogs] = useState([]);
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
 
+  const addLog = React.useCallback((message) => {
+    setLogs((prev) => [{ timestamp: new Date().toLocaleTimeString(), message }, ...prev]);
+  }, []);
+
   const handleCommand = async (command) => {
     addLog(`User: ${command}`);
     try {
       const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
-      const response = await fetch(`${baseUrl}/agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        },
-        body: JSON.stringify({ prompt: command }),
-      });
-      const data = await response.json();
-      addLog(`Agent: ${JSON.stringify(data)}`);
+      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+
+      if (!apiKey) {
+        addLog("Error: VITE_GOOGLE_API_KEY is not set.");
+        return;
+      }
+
+      // 1. Get Context from Backend
+      addLog("System: Capturing screen and UI tree...");
+      const [treeRes, screenRes] = await Promise.all([
+        fetch(`${baseUrl}/ui-tree`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
+        fetch(`${baseUrl}/screenshot`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
+      ]);
+
+      if (!treeRes.ok || !screenRes.ok) {
+        throw new Error("Failed to fetch context from backend.");
+      }
+
+      const uiTree = await treeRes.json();
+      const screenData = await screenRes.json();
+
+      // 2. Call Gemini
+      addLog("System: Gemini is thinking...");
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+      const prompt = `
+        ${SYSTEM_INSTRUCTION}
+        User Request: "${command}"
+        Current UI Tree (JSON): ${JSON.stringify(uiTree)}
+      `;
+
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: screenData.image,
+            mimeType: "image/jpeg"
+          }
+        }
+      ]);
+
+      const responseText = result.response.text().trim();
+
+      // Clean up markdown if present
+      let cleanJson = responseText;
+      if (cleanJson.startsWith("```json")) {
+        cleanJson = cleanJson.split("```json")[1].split("```")[0].trim();
+      } else if (cleanJson.startsWith("```")) {
+        cleanJson = cleanJson.split("```")[1].split("```")[0].trim();
+      }
+
+      const actions = JSON.parse(cleanJson);
+
+      if (Array.isArray(actions) && actions.length > 0) {
+        addLog(`System: Executing ${actions.length} actions...`);
+        for (const action of actions) {
+          addLog(`Action: ${action.action}`);
+          await fetch(`${baseUrl}/execute`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify(action),
+          });
+        }
+        addLog("System: Finished executing actions.");
+      } else {
+        addLog("Agent: I couldn't find any actions to take or the task is complete.");
+      }
+
       setBackendStatus('online');
     } catch (error) {
+      console.error(error);
       addLog(`Error: ${error.message}`);
       setBackendStatus('offline');
     }
   };
-
-  const addLog = React.useCallback((message) => {
-    setLogs((prev) => [{ timestamp: new Date().toLocaleTimeString(), message }, ...prev]);
-  }, []);
 
   React.useEffect(() => {
     const checkBackend = async () => {
