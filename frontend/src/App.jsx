@@ -13,7 +13,10 @@ function App() {
       const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
       const response = await fetch(`${baseUrl}/agent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ prompt: command }),
       });
       const data = await response.json();
@@ -33,7 +36,9 @@ function App() {
     const checkBackend = async () => {
       try {
         const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
-        await fetch(`${baseUrl}/screenshot`);
+        await fetch(`${baseUrl}/screenshot`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
         setBackendStatus('online');
       } catch (e) {
         setBackendStatus('offline');

@@ -8,7 +8,9 @@ const ScreenView = () => {
         const fetchScreenshot = async () => {
             try {
                 const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
-                const response = await fetch(`${baseUrl}/screenshot`);
+                const response = await fetch(`${baseUrl}/screenshot`, {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
                 const data = await response.json();
                 setImage(`data:image/jpeg;base64,${data.image}`);
                 setIsLoading(false);

@@ -239,7 +239,10 @@ export class GeminiLiveClient {
                         const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
                         const res = await fetch(`${baseUrl}/execute`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'ngrok-skip-browser-warning': 'true'
+                            },
                             body: JSON.stringify({ action, params })
                         });
                         const data = await res.json();
@@ -261,7 +264,9 @@ export class GeminiLiveClient {
                     this.logCallback('system', 'Fetching UI Tree...');
                     try {
                         const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
-                        const res = await fetch(`${baseUrl}/ui-tree`);
+                        const res = await fetch(`${baseUrl}/ui-tree`, {
+                            headers: { 'ngrok-skip-browser-warning': 'true' }
+                        });
                         const data = await res.json();
                         responses.push({
                             name: 'get_accessibility_tree',
