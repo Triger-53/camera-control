@@ -43,7 +43,7 @@ function App() {
               </svg>
             </div>
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-              Gemini Agent
+              Device Agent
             </h1>
           </div>
           <div className="text-sm text-gray-400 bg-white/5 px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
