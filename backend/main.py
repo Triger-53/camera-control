@@ -1,6 +1,7 @@
 import os
 import json
 import google.generativeai as genai
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,8 +17,12 @@ import asyncio
 from PIL import Image
 
 # Configure Gemini
-# NOTE: You need to set GOOGLE_API_KEY environment variable
-GOOGLE_API_KEY = "AIzaSyCxm4MLjlP4_GdPEi1JuOGW7tgm4mlf3ng" # Replace with your actual key if different
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    # Fallback to hardcoded key for now as requested, but prioritize environment
+    GOOGLE_API_KEY = "AIzaSyCxm4MLjlP4_GdPEi1JuOGW7tgm4mlf3ng"
+
 genai.configure(api_key=GOOGLE_API_KEY)
 
 app = FastAPI()
