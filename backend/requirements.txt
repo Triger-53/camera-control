@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pyautogui
+pillow
+google-generativeai
+atomacos
+python-multipart
+websockets
