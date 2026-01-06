@@ -9,7 +9,8 @@ function App() {
   const handleCommand = async (command) => {
     addLog(`User: ${command}`);
     try {
-      const response = await fetch(`http://${window.location.hostname}:8000/agent`, {
+      const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
+      const response = await fetch(`${baseUrl}/agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: command }),

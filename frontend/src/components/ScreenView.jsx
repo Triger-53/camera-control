@@ -7,7 +7,8 @@ const ScreenView = () => {
     useEffect(() => {
         const fetchScreenshot = async () => {
             try {
-                const response = await fetch(`http://${window.location.hostname}:8000/screenshot`);
+                const baseUrl = import.meta.env.VITE_API_URL || `http://localhost:8000`;
+                const response = await fetch(`${baseUrl}/screenshot`);
                 const data = await response.json();
                 setImage(`data:image/jpeg;base64,${data.image}`);
                 setIsLoading(false);
